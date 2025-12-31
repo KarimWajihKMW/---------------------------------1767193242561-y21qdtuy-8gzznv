@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize
     loadState();
     updateUI();
+    updateVibrationUI();
 
     // Event Listeners
     clickArea.addEventListener('click', increment);
@@ -40,15 +41,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.code === 'Space') increment();
     });
 
-    resetBtn.addEventListener('click', () => {
+    resetBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         if(confirm('هل أنت متأكد من تصفير العداد؟')) {
             resetCount();
         }
     });
 
-    vibrateBtn.addEventListener('click', toggleVibration);
+    vibrateBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleVibration();
+    });
 
-    settingsBtn.addEventListener('click', openModal);
+    settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openModal();
+    });
+
     closeSettings.addEventListener('click', closeModal);
     saveSettings.addEventListener('click', saveAndCloseModal);
 
@@ -86,12 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (target === 9999) {
             targetDisplay.textContent = 'الهدف: مفتوح';
-            setProgress(100); // Always full or spinning could be better, but static full is fine
+            setProgress(100); 
         } else {
             targetDisplay.textContent = `الهدف: ${target}`;
-            // Calculate progress based on modulo if count > target to keep ring looping
             const progressCount = count % target;
-            // Special case: if count is a multiple of target and not 0, show full ring
             const percentage = (count > 0 && count % target === 0) ? 100 : (progressCount / target) * 100;
             setProgress(percentage);
         }
@@ -103,9 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function animateClick() {
-        // Reset animation
         pulse.classList.remove('animate-pulse-custom');
-        void pulse.offsetWidth; // Trigger reflow
+        void pulse.offsetWidth; 
         pulse.classList.add('animate-pulse-custom');
     }
 
@@ -119,7 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vibrationEnabled && navigator.vibrate) {
             navigator.vibrate([50, 50, 50]);
         }
-        // Could add a small visual flash here
         countDisplay.style.color = '#fff';
         setTimeout(() => {
             countDisplay.style.color = '';
@@ -128,13 +133,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toggleVibration() {
         vibrationEnabled = !vibrationEnabled;
-        vibrateBtn.querySelector('div').classList.toggle('bg-primary');
-        vibrateBtn.querySelector('div').classList.toggle('text-white');
-        vibrateBtn.querySelector('div').classList.toggle('bg-surface');
-        vibrateBtn.querySelector('div').classList.toggle('text-primary');
+        updateVibrationUI();
+        saveState();
         
         // Feedback
-        if (vibrationEnabled) navigator.vibrate(50);
+        if (vibrationEnabled && navigator.vibrate) navigator.vibrate(50);
+    }
+
+    function updateVibrationUI() {
+        const iconDiv = vibrateBtn.querySelector('div');
+        if (vibrationEnabled) {
+            iconDiv.classList.remove('text-gray-400');
+            iconDiv.classList.add('text-primary');
+        } else {
+            iconDiv.classList.remove('text-primary');
+            iconDiv.classList.add('text-gray-400');
+        }
     }
 
     // Settings Logic
@@ -145,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
             modalContent.classList.add('modal-content-active');
         }, 10);
         
-        // Set current values in modal
         dhikrSelect.value = currentDhikr;
         targetBtns.forEach(b => {
             b.classList.remove('active-target');
@@ -166,46 +179,44 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveAndCloseModal() {
         currentDhikr = dhikrSelect.value;
         
-        // Find active target button
         const activeBtn = document.querySelector('.target-btn.active-target');
         if (activeBtn) {
             target = parseInt(activeBtn.dataset.target);
         }
 
-        // Reset count if dhikr changes (optional, but usually preferred)
-        // count = 0; 
-        
         updateUI();
         saveState();
         closeModal();
     }
 
-    // Local Storage
+    // Local Storage (Safe Mode)
     function saveState() {
-        const state = {
-            count,
-            target,
-            currentDhikr,
-            vibrationEnabled
-        };
-        localStorage.setItem('misbahaState', JSON.stringify(state));
+        try {
+            const state = {
+                count,
+                target,
+                currentDhikr,
+                vibrationEnabled
+            };
+            localStorage.setItem('misbahaState', JSON.stringify(state));
+        } catch (e) {
+            console.warn('LocalStorage is unavailable in this environment:', e);
+        }
     }
 
     function loadState() {
-        const saved = localStorage.getItem('misbahaState');
-        if (saved) {
-            const state = JSON.parse(saved);
-            count = state.count || 0;
-            target = state.target || 33;
-            currentDhikr = state.currentDhikr || 'سبحان الله';
-            vibrationEnabled = state.vibrationEnabled !== undefined ? state.vibrationEnabled : true;
-            
-            // Sync vibration button UI
-            if (!vibrationEnabled) {
-               // It defaults to on in HTML, so toggle if off
-               vibrateBtn.querySelector('div').classList.remove('text-primary');
-               vibrateBtn.querySelector('div').classList.add('text-gray-400');
+        try {
+            const saved = localStorage.getItem('misbahaState');
+            if (saved) {
+                const state = JSON.parse(saved);
+                count = state.count || 0;
+                target = state.target || 33;
+                currentDhikr = state.currentDhikr || 'سبحان الله';
+                vibrationEnabled = state.vibrationEnabled !== undefined ? state.vibrationEnabled : true;
             }
+        } catch (e) {
+            console.warn('LocalStorage is unavailable in this environment:', e);
+            // Continue with default values
         }
     }
 });
